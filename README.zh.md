@@ -82,6 +82,28 @@ llm-pi-ai:
 **Q: 会不会影响主代理？**
 不会。agentOptions 只注入 subagent 工具行，主代理仍走 `settings.yaml` 的默认路由。
 
+**Q: 报 "no adapter registered for provider" (NO_ADAPTER)？**
+自定义 provider 必须声明 OpenAI 兼容协议：在 `settings.yaml` 的 provider 配置里加 `api: openai-completions`（dsh 按此选择适配器）。完整示例（智谱 GLM，实测通过）：
+
+```yaml
+llm-pi-ai:
+  providers:
+    zhipu:
+      displayName: 智谱 GLM
+      apiKeyEnv: ZHIPU_API_KEY
+      api: openai-completions        # ← 必须
+      baseURL: https://open.bigmodel.cn/api/paas/v4
+      models:
+        - id: glm-5.3-flash
+          contextWindow: 131072
+          maxTokens: 8192
+```
+
+> ⚠️ **YAML 缩进警告**：`providers:` 下的 provider 键必须缩进 4 空格，models 列表项 8 空格。缩进错一位会导致整个 `llm-pi-ai` 段解析失败（dsh 静默跳过，表现为 NO_ADAPTER）。改完用 `python -c "import yaml; yaml.safe_load(open('settings.yaml'))"` 校验。
+
+**Q: GLM 免费吗？**
+智谱开放平台（open.bigmodel.cn）新用户送 2000 万 tokens 体验包，`glm-5.3-flash` 为免费档模型。
+
 ## 原理
 
 ```
