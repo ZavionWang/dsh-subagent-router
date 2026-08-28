@@ -18,11 +18,12 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 function parseArgs(argv) {
-  const args = { provider: 'openrouter', model: 'stealth/ox-alpha', file: null }
+  const args = { provider: 'openrouter', model: 'stealth/ox-alpha', file: null, force: false }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--file') args.file = argv[++i]
     else if (argv[i] === '--provider') args.provider = argv[++i]
     else if (argv[i] === '--model') args.model = argv[++i]
+    else if (argv[i] === '--force') args.force = true
   }
   return args
 }
@@ -43,7 +44,7 @@ function detectPresetFile() {
 
 const TOOL_IDS = ['tool-subagent', 'tool-subagent-fork']
 
-export function inject(file, provider, model) {
+export function inject(file, provider, model, force = false) {
   let injected = 0
   let skipped = 0
 
@@ -56,9 +57,20 @@ export function inject(file, provider, model) {
     if (!block) { console.log(`  ⚠️ 未找到 ${id} 块，跳过`); continue }
 
     const [full, body] = block
-    if (body.includes('agentOptions:')) {
-      console.log(`  ⏭️  ${id} 已注入 agentOptions，跳过`)
+    if (body.includes('agentOptions:') && !force) {
+      console.log(`  ⏭️  ${id} 已注入 agentOptions（--force 可覆盖），跳过`)
       skipped++
+      continue
+    }
+    if (body.includes('agentOptions:') && force) {
+      // 覆盖模式：替换已有 agentOptions 块
+      const replaced = body.replace(
+        /(\n\s*agentOptions:)(\n\s*provider: [^\n]*\n\s*model: [^\n]*)/,
+        `$1\n${body.match(/^(\s*)agentOptions:/m)[1]}  provider: ${provider}\n${body.match(/^(\s*)agentOptions:/m)[1]}  model: ${model}`
+      )
+      writeFileSync(file, current.replace(full, replaced), 'utf8')
+      console.log(`  🔄 ${id} 已覆盖 agentOptions: ${provider}/${model}`)
+      injected++
       continue
     }
     // 在 backgroundMode: continuable 行后插入（保持缩进风格）
@@ -93,7 +105,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const backup = `${file}.bak-${Date.now()}`
   copyFileSync(file, backup)
   console.log(`💾 备份: ${backup}`)
-  const result = inject(file, args.provider, args.model)
+  const result = inject(file, args.provider, args.model, args.force)
   console.log(`\n完成：注入 ${result.injected} 处，跳过 ${result.skipped} 处`)
   console.log('⚠️ 修改后必须重启 dsh 才生效')
 }
