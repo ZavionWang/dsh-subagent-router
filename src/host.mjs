@@ -32,9 +32,20 @@ export function apply(ctx) {
     const file = detectPresetFile()
     if (!file) { log('未找到 agent.cordis.yml，跳过检查'); return }
     const content = readFileSync(file, 'utf8')
+    const lines = content.split('\n')
+    // 行级块解析：找 - id: <tool> 块（到下一个顶格 - id: 或 EOF），判断块内是否含 agentOptions
     const injected = TOOL_IDS.filter((id) => {
-      const re = new RegExp(`- id: ${id}\\n[\\s\\S]*?agentOptions:`, 'm')
-      return re.test(content)
+      let start = -1
+      for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(/^\s*- id:\s*(\S+)/)
+        if (m) {
+          if (m[1] === id) { start = i; continue }
+          if (start >= 0) {
+            return lines.slice(start, i).join('\n').includes('agentOptions:')
+          }
+        }
+      }
+      return start >= 0 && lines.slice(start).join('\n').includes('agentOptions:')
     })
     if (injected.length === TOOL_IDS.length) {
       log(`✅ 子代理路由隔离已生效（${injected.join(' / ')} 均含 agentOptions）`)

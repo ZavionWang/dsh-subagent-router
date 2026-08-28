@@ -12,11 +12,41 @@ dsh 的子代理**默认继承主代理（父代理）的模型路由**。如果
 
 ## 安装
 
+**前置依赖**：Node.js ≥ 18；`verify` 需要 **Python + zstandard**（解压 dsh 会话文件，`pip install zstandard`）。
+
 ```bash
 npm install -g @zavionwang/dsh-subagent-router
 ```
 
-（或在 `cordis.patch.yml` / 插件列表中添加 `@zavionwang/dsh-subagent-router`）
+> 本包提供两个 CLI 工具：`dsr-inject`（配置注入）与 `dsr-verify`（路由验证）。全局安装后两个命令即可用。
+> 宿主端启动检查（`src/host.mjs`）为可选增强：将本包加入 dsh profile 的插件依赖后由 cordis 挂载，缺失时不影响 CLI 功能。
+
+### 推荐：用户 patch 层注入（升级安全通道）
+
+`inject` 直改 npm 包内的 `agent.cordis.yml`，**dsh 升级会还原该文件（需重跑注入）**。想一劳永逸，可用 dsh 的用户 patch 层（`~/.dsh/cordis.patch.yml`）按工具 id 覆写完整 config：
+
+```yaml
+- replace:
+    id: tool-subagent
+    config:
+      provider: spawn
+      toolName: subagent
+      backgroundMode: continuable
+      agentOptions:
+        provider: openrouter
+        model: stealth/ox-alpha
+- replace:
+    id: tool-subagent-fork
+    config:
+      provider: fork
+      toolName: subagent_fork
+      backgroundMode: continuable
+      agentOptions:
+        provider: openrouter
+        model: stealth/ox-alpha
+```
+
+> dsh 的 patch 按 id 递归寻址嵌套行，`replace` 会整体替换目标行的 config——这是官方支持的升级安全通道，不随 dsh 升级丢失。
 
 ## 快速开始
 
@@ -44,12 +74,26 @@ dsr-verify
 
 # 只看最近 N 个会话
 dsr-verify --recent 5
+# 指定会话目录
+dsr-verify --dir "D:\other-sessions"
 ```
 
 **判定标准**（权威证据是会话记录，不是子代理自报——自报可能因 persona 误报）：
 
 - 子代理分布中**不应出现**主渠道（如 `deepseek-official/deepseek-v4-flash`）
 - 子代理应全部为配置的 provider/model（如 `openrouter/stealth/ox-alpha`）
+
+### 其他参数与回滚
+
+```bash
+dsr-inject --dry-run          # 只预览不写入
+dsr-inject --force            # 覆盖已有注入（换 provider/model 时用）
+dsr-inject --file <路径>       # 指定 agent.cordis.yml
+```
+
+- **回滚**：inject 每次实际修改前自动备份（`agent.cordis.yml.bak-<时间戳>`，保留最近 5 份），用备份覆盖回去即可；或 `dsr-inject --force --provider <原值> --model <原值>` 改回
+- **卸载**：CLI 全局卸载 `npm uninstall -g @zavionwang/dsh-subagent-router`；注入内容保留在 agent.cordis.yml（不影响运行，只是子代理回到继承主路由），可手动删除 `agentOptions:` 块还原
+- **覆盖盲区**：`workflow` 工作线程与 `tool-ralph` 的 spawn 不走本注入——它们仍继承主代理路由；如需覆盖需另行配置
 
 ## 配套：provider 路由与凭证
 

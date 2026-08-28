@@ -13,12 +13,18 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { pathToFileURL } from 'node:url'
 
 function parseArgs(argv) {
   const args = { dir: null, recent: 0 }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--dir') args.dir = argv[++i]
-    else if (argv[i] === '--recent') args.recent = parseInt(argv[++i], 10) || 0
+    else if (argv[i] === '--recent') {
+      const n = parseInt(argv[++i], 10)
+      if (!Number.isFinite(n) || n <= 0) { console.error(`❌ --recent 需要正整数，收到: ${argv[i]}`); process.exit(1) }
+      args.recent = n
+    }
+    else { console.error(`❌ 未知参数: ${argv[i]}`); process.exit(1) }
   }
   return args
 }
@@ -41,10 +47,24 @@ function collectSessionFiles(root) {
   return out
 }
 
+/** 探测可用的 python（Windows 上 python 可能是 Store stub，py 启动器更可靠） */
+function findPython() {
+  for (const cand of ['python', 'py', 'python3']) {
+    const r = spawnSync(cand, ['--version'], { encoding: 'utf8' })
+    if (r.status === 0 && /Python/i.test(r.stdout || r.stderr || '')) return cand
+  }
+  return null
+}
+let PYTHON_BIN
+
 /** 读取会话文件（zstd 用 python zstandard 解压，明文直接读） */
 function readSessionFile(file) {
   if (file.endsWith('.zstd')) {
-    const r = spawnSync('python', ['-c',
+    if (!PYTHON_BIN) {
+      PYTHON_BIN = findPython()
+      if (!PYTHON_BIN) throw new Error('未找到可用的 python（需要 zstandard 解压会话文件）——请安装 Python 并 pip install zstandard')
+    }
+    const r = spawnSync(PYTHON_BIN, ['-c',
       'import sys,zstandard;dctx=zstandard.ZstdDecompressor();\nwith dctx.stream_reader(sys.stdin.buffer) as r:\n    sys.stdout.buffer.write(r.read())',
     ], { input: readFileSync(file), encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
     if (r.status !== 0) {
@@ -106,8 +126,8 @@ export function analyze(sessionDir, recent = 0) {
   }
 }
 
-// CLI 入口
-if (process.argv[1] && import.meta.url === new URL(import.meta.url).href) {
+// CLI 入口（与 import 复用区分：pathToFileURL 精确匹配，避免 import 即触发扫描）
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const args = parseArgs(process.argv.slice(2))
   const dir = args.dir || sessionsDir()
   const r = analyze(dir, args.recent)
