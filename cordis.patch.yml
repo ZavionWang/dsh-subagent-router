@@ -1,0 +1,5 @@
+# dsh-subagent-router: 子代理 LLM 路由隔离插件。
+# 安装后挂载宿主端启动检查（注入状态提示），配置注入由 scripts/inject.mjs 完成。
+- insert:
+    - id: subagent-router
+      name: '@zavionwang/dsh-subagent-router'

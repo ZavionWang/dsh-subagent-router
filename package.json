@@ -1,0 +1,41 @@
+{
+  "name": "@zavionwang/dsh-subagent-router",
+  "version": "0.1.0",
+  "description": "dsh 子代理 LLM 路由隔离插件：让 subagent/subagent_fork 自动走独立 provider/model，防烧主渠道额度。含一键注入与验证工具。",
+  "type": "module",
+  "main": "./src/host.mjs",
+  "bin": {
+    "dsr-inject": "./scripts/inject.mjs",
+    "dsr-verify": "./scripts/verify.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "subagent",
+    "llm",
+    "router",
+    "provider"
+  ],
+  "license": "MIT",
+  "files": [
+    "src/",
+    "scripts/",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZavionWang/dsh-subagent-router.git"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
